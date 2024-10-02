@@ -20,6 +20,7 @@ limitations under the License.
 #include <functional>
 #include <iterator>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -33,6 +34,8 @@ limitations under the License.
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "llvm/ADT/STLExtras.h"
+#include "third_party/protobuf/message.h"
 #include "xla/debug_options_flags.h"
 #include "xla/error_spec.h"
 #include "xla/hlo/ir/hlo_instruction.h"
@@ -1179,9 +1182,12 @@ HloTestBase::GetHloRunnerForTest(se::Platform* test_platform) {
 
     auto device_shape_representation_fn =
         pjrt_registry.GetDeviceShapeRepresentationFn(client.get());
+    auto device_shape_size_fn =
+        pjrt_registry.GetDeviceShapeSizeFn(client.get());
 
     return std::unique_ptr<HloRunnerInterface>(
-        new HloRunnerPjRt(std::move(client), device_shape_representation_fn));
+        new HloRunnerPjRt(std::move(client), device_shape_representation_fn,
+                          device_shape_size_fn));
   } else {
     return std::unique_ptr<HloRunnerInterface>(new HloRunner(test_platform));
   }

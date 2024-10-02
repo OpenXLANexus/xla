@@ -16,25 +16,28 @@ limitations under the License.
 #ifndef XLA_SERVICE_HLO_RUNNER_H_
 #define XLA_SERVICE_HLO_RUNNER_H_
 
-#include <map>
+#include <cstdint>
+#include <functional>
 #include <memory>
-#include <set>
-#include <string>
 #include <vector>
 
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
+#include "xla/executable_run_options.h"
 #include "xla/hlo/ir/hlo_computation.h"
 #include "xla/hlo/ir/hlo_module.h"
+#include "xla/literal.h"
 #include "xla/service/backend.h"
 #include "xla/service/compiler.h"
+#include "xla/service/computation_layout.h"
 #include "xla/service/computation_placer.h"
 #include "xla/service/executable.h"
 #include "xla/service/hlo_runner_interface.h"
-#include "xla/status_macros.h"
+#include "xla/service/service_executable_run_options.h"
+#include "xla/service/shaped_buffer.h"
 #include "xla/stream_executor/device_memory_allocator.h"
-#include "xla/stream_executor/stream_executor.h"
-#include "xla/types.h"
+#include "xla/stream_executor/platform.h"
 #include "xla/util.h"
 #include "xla/xla_data.pb.h"
 
@@ -187,8 +190,12 @@ class HloRunner : public HloRunnerInterface {
 
   absl::string_view Name() const override;
 
-  DeviceShapeRepresentationFn device_shape_representation_fn() {
+  DeviceShapeRepresentationFn device_shape_representation_fn() const override {
     return device_shape_representation_fn_;
+  }
+
+  DeviceShapeSizeFn device_shape_size_fn() const override {
+    return backend().compiler()->ShapeSizeBytesFunction();
   }
 
  private:

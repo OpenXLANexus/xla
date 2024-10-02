@@ -15,8 +15,6 @@ limitations under the License.
 
 #include "xla/tests/pjrt_client_registry.h"
 
-#include <functional>
-#include <memory>
 #include <utility>
 
 namespace xla {
@@ -29,9 +27,12 @@ PjRtClientTestFactoryRegistry& GetGlobalPjRtClientTestFactory() {
 void RegisterPjRtClientTestFactory(
     PjRtClientTestFactoryRegistry::PjRtClientFactory factory,
     PjRtClientTestFactoryRegistry::DeviceShapeRepresentationFnFactory
-        registered_device_shape_representation_fn) {
+        registered_device_shape_representation_fn,
+    PjRtClientTestFactoryRegistry::DeviceShapeSizeFnFactory
+        registered_device_shape_size_fn) {
   GetGlobalPjRtClientTestFactory().Register(
-      std::move(factory), registered_device_shape_representation_fn);
+      std::move(factory), registered_device_shape_representation_fn,
+      registered_device_shape_size_fn);
 }
 
 bool ShouldUsePjRt() {

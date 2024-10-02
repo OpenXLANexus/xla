@@ -138,7 +138,12 @@ cc_library(
     srcs = ["pjrt_client_registry.cc"],
     hdrs = ["pjrt_client_registry.h"],
     deps = [
+        "//xla:shape_util",
         "//xla/pjrt:pjrt_client",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/log",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -178,6 +183,7 @@ cc_library(
         ":pjrt_client_registry",
         ":test_utils",
         ":verified_hlo_module",
+        "//third_party/protobuf",
         "//xla:debug_options_flags",
         "//xla:error_spec",
         "//xla:literal",
@@ -213,6 +219,7 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:string_view",
         "@com_google_absl//absl/types:span",
+        "@llvm-project//llvm:Support",
         "@tsl//tsl/platform:errors",
         "@tsl//tsl/platform:logging",
         "@tsl//tsl/platform:status",

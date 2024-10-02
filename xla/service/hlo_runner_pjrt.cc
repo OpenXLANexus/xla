@@ -23,19 +23,26 @@ limitations under the License.
 #include <vector>
 
 #include "absl/algorithm/container.h"
+#include "absl/log/check.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
+#include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "xla/hlo/builder/xla_computation.h"
 #include "xla/hlo/ir/hlo_module.h"
 #include "xla/layout.h"
+#include "xla/literal.h"
 #include "xla/pjrt/host_memory_spaces.h"
 #include "xla/pjrt/pjrt_client.h"
 #include "xla/pjrt/pjrt_executable.h"
 #include "xla/pjrt/pjrt_future.h"
 #include "xla/service/computation_layout.h"
+#include "xla/service/computation_placer.h"
 #include "xla/service/executable.h"
+#include "xla/service/hlo_execution_profile.h"
 #include "xla/service/hlo_module_util.h"
+#include "xla/service/hlo_runner_interface.h"
+#include "xla/service/service_executable_run_options.h"
 #include "xla/shape_layout.h"
 #include "xla/shape_util.h"
 #include "xla/status_macros.h"
@@ -145,9 +152,11 @@ static const int kDeviceIdx = 0;
 
 HloRunnerPjRt::HloRunnerPjRt(
     std::unique_ptr<PjRtClient> pjrt_client,
-    DeviceShapeRepresentationFn device_shape_representation_fn)
+    DeviceShapeRepresentationFn device_shape_representation_fn,
+    DeviceShapeSizeFn device_shape_size_fn)
     : pjrt_client_(std::move(pjrt_client)),
-      device_shape_representation_fn_(device_shape_representation_fn) {}
+      device_shape_representation_fn_(device_shape_representation_fn),
+      device_shape_size_fn_(device_shape_size_fn) {}
 
 HloRunnerPjRt::~HloRunnerPjRt() = default;
 
