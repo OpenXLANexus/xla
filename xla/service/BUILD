@@ -6686,6 +6686,7 @@ cc_library(
         "//xla:literal_util",
         "//xla:shape_tree",
         "//xla:shape_util",
+        "//xla:side_effect_util",
         "//xla:status_macros",
         "//xla:util",
         "//xla/hlo/ir:hlo",
@@ -6717,6 +6718,7 @@ xla_cc_test(
         ":pattern_matcher",
         ":pattern_matcher_gmock",
         "//xla:shape_util",
+        "//xla:side_effect_util",
         "//xla:util",
         "//xla/hlo/ir:hlo",
         "//xla/tests:hlo_test_base",
@@ -6740,6 +6742,7 @@ cc_library(
     deps = [
         ":call_graph",
         ":host_memory_offload_annotations_hdr",
+        "//xla:shape_util",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/pass:hlo_pass",
         "@com_google_absl//absl/container:flat_hash_set",

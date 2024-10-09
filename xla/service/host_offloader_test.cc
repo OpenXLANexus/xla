@@ -35,6 +35,7 @@ limitations under the License.
 #include "xla/service/hlo_verifier.h"
 #include "xla/service/host_memory_offload_annotations.h"
 #include "xla/service/host_offload_legalize.h"
+#include "xla/service/host_offload_utils.h"
 #include "xla/service/pattern_matcher.h"
 #include "xla/service/pattern_matcher_gmock.h"
 #include "xla/shape.h"
@@ -4071,19 +4072,19 @@ TEST_F(HostOffloaderTest, RemoveRedundantCopiesBackToHostOutputIsNonTuple) {
     HloModule jit_main, input_output_alias={ {0}: (0, {}, may-alias), {1}: (1, {}, may-alias) }, entry_computation_layout={(f32[1048576]{0:T(1024)}, f32[25769803776]{0:T(1024)S(5)})->(f32[1048576]{0:T(1024)}, f32[25769803776]{0:T(1024)S(5)})}, allow_spmd_sharding_propagation_to_parameters={false,false}, allow_spmd_sharding_propagation_to_output={false,false}
 
     %host_fn.6 (Arg_0.7: f32[25769803776]) -> f32[25769803776] {
-      %Arg_0.7 = f32[25769803776]{0} parameter(0), metadata={op_name="jit(main)/jit(main)/pjit"}
+      %Arg_0.7 = f32[25769803776]{0} parameter(0)
       %constant.8 = f32[] constant(1)
-      %broadcast.9 = f32[25769803776]{0} broadcast(f32[] %constant.8), dimensions={}, metadata={op_name="jit(main)/jit(main)/jit(host_fn)/add" source_file="third_party/py/jax/tests/memories_test.py" source_line=1448}
-      ROOT %add.10 = f32[25769803776]{0} add(f32[25769803776]{0} %Arg_0.7, f32[25769803776]{0} %broadcast.9), frontend_attributes={_xla_compute_type="host"}, metadata={op_name="jit(main)/jit(main)/jit(host_fn)/add" source_file="third_party/py/jax/tests/memories_test.py" source_line=1448}
+      %broadcast.9 = f32[25769803776]{0} broadcast(f32[] %constant.8), dimensions={}
+      ROOT %add.10 = f32[25769803776]{0} add(f32[25769803776]{0} %Arg_0.7, f32[25769803776]{0} %broadcast.9), frontend_attributes={_xla_compute_type="host"}
     }, execution_thread="host"
 
     ENTRY %main.17 (Arg_0.1: f32[1048576], Arg_1.2: f32[25769803776]) -> (f32[1048576], f32[25769803776]) {
-      %Arg_0.1 = f32[1048576]{0:T(1024)} parameter(0), sharding={replicated}, metadata={op_name="a"}
+      %Arg_0.1 = f32[1048576]{0:T(1024)} parameter(0), sharding={replicated}
       %constant.3 = f32[]{:T(128)} constant(1)
-      %broadcast.4 = f32[1048576]{0:T(1024)} broadcast(f32[]{:T(128)} %constant.3), dimensions={}, metadata={op_name="jit(main)/jit(main)/add" source_file="third_party/py/jax/tests/memories_test.py" source_line=1454}
-      %add.5 = f32[1048576]{0:T(1024)} add(f32[1048576]{0:T(1024)} %Arg_0.1, f32[1048576]{0:T(1024)} %broadcast.4), metadata={op_name="jit(main)/jit(main)/add" source_file="third_party/py/jax/tests/memories_test.py" source_line=1454}
+      %broadcast.4 = f32[1048576]{0:T(1024)} broadcast(f32[]{:T(128)} %constant.3), dimensions={}
+      %add.5 = f32[1048576]{0:T(1024)} add(f32[1048576]{0:T(1024)} %Arg_0.1, f32[1048576]{0:T(1024)} %broadcast.4)
       %custom-call = f32[1048576]{0:T(1024)} custom-call(f32[1048576]{0:T(1024)} %add.5), custom_call_target="MoveToDevice"
-      %Arg_1.2 = f32[25769803776]{0:T(1024)} parameter(1), sharding={replicated}, metadata={op_name="b"}
+      %Arg_1.2 = f32[25769803776]{0:T(1024)} parameter(1), sharding={replicated}
       %host-async-start = ((f32[25769803776]{0:T(1024)}), f32[25769803776]{0:T(1024)}, u32[]{:T(128)}) custom-call-start(f32[25769803776]{0:T(1024)} %Arg_1.2), async_execution_thread="host", custom_call_target="HostExecute", called_computations={%host_fn.6}, backend_config={"flag_configs":[],"scoped_memory_configs":[],"device_type":"DEVICE_TYPE_HOST","used_scoped_memory_configs":[]}
       %host-async-done = f32[25769803776]{0:T(1024)} custom-call-done(((f32[25769803776]{0:T(1024)}), f32[25769803776]{0:T(1024)}, u32[]{:T(128)}) %host-async-start), backend_config={"flag_configs":[],"scoped_memory_configs":[],"device_type":"DEVICE_TYPE_HOST","used_scoped_memory_configs":[]}
       %redundant-move-to-host = f32[25769803776]{0:T(1024)} custom-call(f32[25769803776]{0:T(1024)} %host-async-done), custom_call_target="MoveToHost"
@@ -4188,6 +4189,63 @@ TEST_F(HostOffloaderTest, AvoidRedundantCopiesToHost) {
   for (HloInstruction* instr : module->entry_computation()->instructions()) {
     ASSERT_NE(instr->opcode(), HloOpcode::kCopy);
   }
+}
+
+TEST_F(HostOffloaderTest, MarkAllGatherCollectiveAsHostCompute) {
+  const absl::string_view hlo_string = R"(
+HloModule jit_f, entry_computation_layout={(f32[1024,256]{1,0:T(8,128)}, f32[1024,256]{1,0:T(8,128)})->f32[1024,1024]{1,0:T(8,128)S(5)}}, num_partitions=4
+
+ENTRY main.8_spmd {
+  param = f32[1024,256]{1,0:T(8,128)} parameter(0), sharding={devices=[1,4]<=[4]}
+  param.1 = f32[1024,256]{1,0:T(8,128)} parameter(1), sharding={devices=[1,4]<=[4]}
+  add.0 = f32[1024,256]{1,0:T(8,128)} add(param, param.1)
+  custom-call.2 = f32[1024,256]{1,0:T(8,128)} custom-call(add.0), custom_call_target="MoveToHost"
+  all-gather = f32[1024,1024]{1,0:T(8,128)} all-gather(custom-call.2), channel_id=1, replica_groups=[1,4]<=[4], dimensions={1}, use_global_device_ids=true
+  ROOT custom-call.3 = f32[1024,1024]{1,0:T(8,128)} custom-call(all-gather), custom_call_target="MoveToHost"
+})";
+
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<VerifiedHloModule> module,
+                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, RunHostOffloader(module.get()));
+  EXPECT_TRUE(changed);
+  VLOG(1) << module->ToString();
+
+  HloInstruction* all_gather = FindInstruction(module.get(), "all-gather");
+  ASSERT_NE(all_gather, nullptr);
+  EXPECT_TRUE(host_offload_utils::ComputeTypeIsHost(all_gather));
+}
+
+TEST_F(HostOffloaderTest, MarkAllReduceCollectiveAsHostCompute) {
+  const absl::string_view hlo_string = R"(
+HloModule jit_f, entry_computation_layout={(f32[704]{0:T(1024)},u32[]{:T(128)})->f32[1408]{0:T(1024)S(5)}}, num_partitions=4
+
+add.580 {
+  x.1158 = f32[]{:T(128)} parameter(0)
+  y.1158 = f32[]{:T(128)} parameter(1)
+  ROOT add.38918 = f32[]{:T(128)} add(x.1158, y.1158)
+}
+
+ENTRY main {
+  param_0 = f32[704]{0:T(1024)} parameter(0)
+  param_1 = u32[]{:T(128)} parameter(1)
+  custom_call_0 = f32[704]{0:T(1024)} custom-call(param_0), custom_call_target="MoveToHost"
+  constant = f32[]{:T(128)} constant(0)
+  broadcast = f32[1408]{0:T(1024)} broadcast(constant), dimensions={}
+  dus = f32[1408]{0:T(1024)} dynamic-update-slice(broadcast, custom_call_0, param_1), backend_config={"flag_configs":[],"scoped_memory_configs":[],"indi
+ces_config":{"index_known_bits":[{"zeroes":"4294965311","ones":"0","bitwidth":"32"}]},"used_scoped_memory_configs":[]}
+  all_reduce = f32[1408]{0:T(1024)} all-reduce(dus), channel_id=2798, replica_groups=[2,2]<=[4], use_global_device_ids=true, to_apply=add.580
+  ROOT custom_call_1 = f32[1408]{0:T(1024)} custom-call(all_reduce), custom_call_target="MoveToHost"
+})";
+
+  TF_ASSERT_OK_AND_ASSIGN(std::unique_ptr<VerifiedHloModule> module,
+                          ParseAndReturnVerifiedModule(hlo_string));
+  TF_ASSERT_OK_AND_ASSIGN(bool changed, RunHostOffloader(module.get()));
+  EXPECT_TRUE(changed);
+  VLOG(1) << module->ToString();
+
+  HloInstruction* all_reduce = FindInstruction(module.get(), "all_reduce");
+  ASSERT_NE(all_reduce, nullptr);
+  EXPECT_TRUE(host_offload_utils::ComputeTypeIsHost(all_reduce));
 }
 
 }  // namespace

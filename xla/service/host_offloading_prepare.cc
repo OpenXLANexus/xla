@@ -30,6 +30,8 @@ limitations under the License.
 #include "xla/hlo/ir/hlo_opcode.h"
 #include "xla/service/call_graph.h"
 #include "xla/service/host_memory_offload_annotations.h"
+#include "xla/shape.h"
+#include "xla/shape_util.h"
 #include "tsl/platform/errors.h"
 #include "tsl/platform/statusor.h"
 
@@ -120,6 +122,26 @@ absl::StatusOr<bool> ConvertToCustomCall(HloModule* module) {
         async_computation->set_root_instruction(
             async_computation->AddInstruction(std::move(custom_call)));
         TF_RETURN_IF_ERROR(async_computation->RemoveInstruction(call));
+
+        // In case instructions have been converted to host compute after
+        // LayoutAssignment, remove the tiles and set the memory space back to
+        // default.
+        for (HloComputation* called_computation :
+             async_computation->root_instruction()->called_computations()) {
+          for (HloInstruction* instr : called_computation->instructions()) {
+            ShapeUtil::ForEachMutableSubshape(
+                instr->mutable_shape(),
+                [](Shape* subshape, const ShapeIndex& index) {
+                  if (subshape->has_layout()) {
+                    // Remove tiles from the layout.
+                    subshape->mutable_layout()->clear_tiles();
+                    // Set memory space back to default.
+                    subshape->mutable_layout()->set_memory_space(
+                        Layout::kDefaultMemorySpace);
+                  }
+                });
+          }
+        }
 
         changed = true;
       }
