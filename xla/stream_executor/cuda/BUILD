@@ -1066,7 +1066,6 @@ cc_library(
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/debugging:leak_check",
         "@com_google_absl//absl/log:check",
         "@com_google_absl//absl/numeric:int128",
         "@com_google_absl//absl/status",
@@ -1220,6 +1219,7 @@ cc_library(
         ":cuda_status",
         "//xla/stream_executor:device_memory",
         "//xla/stream_executor:event",
+        "//xla/stream_executor:event_based_timer",
         "//xla/stream_executor:kernel",
         "//xla/stream_executor:launch_dim",
         "//xla/stream_executor:platform",
@@ -1250,6 +1250,7 @@ xla_test(
     backends = ["gpu"],
     tags = ["cuda-only"],
     deps = [
+        ":cuda_event",
         ":cuda_executor",
         ":cuda_platform_id",
         ":cuda_stream",

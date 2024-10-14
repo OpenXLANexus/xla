@@ -1003,6 +1003,7 @@ cc_library(
         ":rocm_status",
         "//xla/stream_executor:device_memory",
         "//xla/stream_executor:event",
+        "//xla/stream_executor:event_based_timer",
         "//xla/stream_executor:kernel",
         "//xla/stream_executor:launch_dim",
         "//xla/stream_executor:platform",
@@ -1035,6 +1036,7 @@ xla_test(
         "manual",
     ]),
     deps = [
+        ":rocm_event",
         ":rocm_executor",
         ":rocm_platform_id",
         ":rocm_stream",
@@ -1047,6 +1049,7 @@ xla_test(
         "//xla/stream_executor:typed_kernel_factory",
         "//xla/stream_executor/gpu:gpu_test_kernels",
         "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings:string_view",
         "@com_google_absl//absl/types:span",
         "@com_google_googletest//:gtest_main",
         "@tsl//tsl/platform:status_matchers",
