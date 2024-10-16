@@ -479,7 +479,6 @@ cc_library(
         "//xla/stream_executor/gpu:gpu_executor_header",
         "//xla/stream_executor/gpu:gpu_helpers_header",
         "//xla/stream_executor/gpu:gpu_stream_header",
-        "//xla/stream_executor/gpu:gpu_types_header",
         "//xla/stream_executor/platform:initialize",
         "//xla/tsl/util:determinism_hdr_lib",
         "@com_google_absl//absl/base:core_headers",
