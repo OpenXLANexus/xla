@@ -560,26 +560,29 @@ bool InferScatterParallelShardingFromOperands(
 
 bool CanPropagateThroughAtAggressiveLevel(const HloInstruction& inst,
                                           int64_t aggressiveness) {
-  // At minimum aggressiveness, only allow pass-through ops.
-  if (aggressiveness < 1 &&
-      !(inst.IsElementwise() || inst.IsCustomCall("Sharding")) &&
-      inst.opcode() != HloOpcode::kTranspose &&
-      inst.opcode() != HloOpcode::kReshape &&
-      inst.opcode() != HloOpcode::kTuple &&
-      inst.opcode() != HloOpcode::kGetTupleElement &&
-      inst.opcode() != HloOpcode::kWhile &&
-      inst.opcode() != HloOpcode::kDynamicSlice &&
-      inst.opcode() != HloOpcode::kDynamicUpdateSlice &&
-      inst.opcode() != HloOpcode::kOptimizationBarrier &&
-      inst.opcode() != HloOpcode::kConcatenate &&
-      inst.opcode() != HloOpcode::kCall && inst.opcode() != HloOpcode::kCopy) {
-    return false;
+  // Always allow pass-through ops.
+  if (inst.IsElementwise() || inst.IsCustomCall("Sharding") ||
+      inst.opcode() == HloOpcode::kCall ||
+      inst.opcode() == HloOpcode::kConcatenate ||
+      inst.opcode() == HloOpcode::kCopy ||
+      inst.opcode() == HloOpcode::kDynamicSlice ||
+      inst.opcode() == HloOpcode::kDynamicUpdateSlice ||
+      inst.opcode() == HloOpcode::kGetTupleElement ||
+      inst.opcode() == HloOpcode::kOptimizationBarrier ||
+      inst.opcode() == HloOpcode::kReshape ||
+      inst.opcode() == HloOpcode::kTuple ||
+      inst.opcode() == HloOpcode::kTranspose ||
+      inst.opcode() == HloOpcode::kWhile) {
+    return true;
   }
+
   // Broadcast propagation should have at least aggressiveness 2.
-  if (aggressiveness < 2 && inst.opcode() == HloOpcode::kBroadcast) {
-    return false;
+  if (inst.opcode() == HloOpcode::kBroadcast) {
+    return aggressiveness >= 2;
   }
-  return true;
+
+  // Other ops should have at least aggressiveness 1.
+  return aggressiveness >= 1;
 }
 
 // Checks if two HloShardings have the same metadata attached.
