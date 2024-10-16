@@ -398,7 +398,8 @@ ApproximateLatencyEstimator::TimeCost GpuLatencyEstimator::GetLatencyBetween(
 void GPUProfileStatisticsAggregator::HandleMissingInstructionCost(
     const HloInstruction& instruction) {
   if (!IsNopInstruction(instruction) &&
-      instruction.opcode() != HloOpcode::kWhile) {
+      instruction.opcode() != HloOpcode::kWhile &&
+      instruction.opcode() != HloOpcode::kCopy) {
     missing_instructions_.insert(&instruction);
   }
 }

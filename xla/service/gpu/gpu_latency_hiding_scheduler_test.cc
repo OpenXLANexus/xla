@@ -122,6 +122,39 @@ TEST_F(GpuLatencyHidingSchedulerBaseTest,
   }
 }
 
+// See b/373800086 for motivation.
+TEST_F(GpuLatencyHidingSchedulerBaseTest,
+       GPUProfileStatisticsAggregatorDoesNotCountCopies) {
+  GPUProfileStatisticsAggregator aggregator;
+  ProfileStatisticsAggregator::Statistics before_stats = aggregator.GetStats();
+
+  ASSERT_EQ(before_stats.missing_instructions.size(), 0);
+  ASSERT_EQ(before_stats.found_instructions_count, 0);
+
+  absl::string_view kFdoProfile = "";
+  absl::string_view kHloModule = R"(
+    HloModule m
+
+    ENTRY main {
+      parameter.0 = f32[] parameter(0)
+      ROOT copy.0 = copy(parameter.0)
+    }
+  )";
+
+  auto config = GetModuleConfig(kFdoProfile);
+  TF_ASSERT_OK_AND_ASSIGN(auto module,
+                          ParseAndReturnVerifiedModule(kHloModule, config));
+
+  for (const HloInstruction* instr :
+       module->entry_computation()->instructions()) {
+    aggregator.HandleMissingInstructionCost(*instr);
+
+    ProfileStatisticsAggregator::Statistics after_stats = aggregator.GetStats();
+    EXPECT_EQ(after_stats.missing_instructions.size(), 0);
+    EXPECT_EQ(after_stats.found_instructions_count, 0);
+  }
+}
+
 TEST_F(GpuLatencyHidingSchedulerBaseTest,
        GPUProfileStatisticsAggregatorCountsMissingInstruction) {
   GPUProfileStatisticsAggregator aggregator;
